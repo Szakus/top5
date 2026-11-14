@@ -118,6 +118,9 @@ export default function FocusMode() {
   // square top, rounded bottom corners, no border. The right end needs the wide padding only
   // when it is the side tucked under the notch; the buttons there carry their own inset.
   const barPadding = dock === 'notch-left' || dock === 'top-right' ? 'px-6' : 'pl-6 pr-2'
+  // Docked bar sits in peripheral vision all day: content is dimmed and colorless until hovered
+  // (the black background stays opaque so it still merges with the notch).
+  const barDim = '[&>*]:opacity-50 [&>*]:grayscale [&>*]:transition-[opacity,filter] hover:[&>*]:opacity-100 hover:[&>*]:grayscale-0'
   const barShell = docked
     ? 'h-[32px] flex items-center bg-black rounded-b-xl'
     : 'h-[50px] flex items-center rounded-xl bg-clean-view/95 border border-border/50'
@@ -556,12 +559,12 @@ export default function FocusMode() {
     >
       {/* Main bar */}
       <div
-        className={`${barShell} ${docked ? `${barPadding} gap-2` : 'pl-4 pr-1.5 gap-2.5'}`}
+        className={`${barShell} ${docked ? `${barPadding} gap-2 ${barDim}` : 'pl-4 pr-1.5 gap-2.5'}`}
         style={barDrag}
         onContextMenu={handleContextMenu}
       >
         <div
-          className="w-[7px] h-[7px] rounded-full animate-pulse flex-shrink-0 self-center"
+          className={`w-[7px] h-[7px] rounded-full ${docked ? '' : 'animate-pulse'} flex-shrink-0 self-center`}
           style={{ background: projColor || '#3b82f6' }}
         />
         {isDev && (
