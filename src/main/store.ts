@@ -57,6 +57,7 @@ import type {
   WinEntry,
   StreakStats
 } from '../shared/types'
+import { isFocusDock } from '../shared/types'
 import { STANDALONE_PROJECT_ID } from '../shared/constants'
 
 // Re-export types for convenience
@@ -462,7 +463,8 @@ function normalizeAppConfig(value: unknown): AppConfig {
     obsidianVaultName: typeof value.obsidianVaultName === 'string' && value.obsidianVaultName.trim().length > 0
       ? value.obsidianVaultName.trim()
       : undefined,
-    baseFontSize: typeof value.baseFontSize === 'number' ? Math.max(10, Math.min(18, value.baseFontSize)) : undefined
+    baseFontSize: typeof value.baseFontSize === 'number' ? Math.max(10, Math.min(18, value.baseFontSize)) : undefined,
+    focusDock: isFocusDock(value.focusDock) ? value.focusDock : undefined
   }
 }
 
@@ -493,6 +495,7 @@ function isValidAppConfig(value: unknown): value is AppConfig {
   if (value.obsidianStoragePath !== undefined && typeof value.obsidianStoragePath !== 'string') return false
   if (value.obsidianVaultName !== undefined && typeof value.obsidianVaultName !== 'string') return false
   if (value.baseFontSize !== undefined && (typeof value.baseFontSize !== 'number' || value.baseFontSize < 10 || value.baseFontSize > 18)) return false
+  if (value.focusDock !== undefined && !isFocusDock(value.focusDock)) return false
   return true
 }
 

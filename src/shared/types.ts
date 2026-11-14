@@ -1,3 +1,16 @@
+/** Where the focus bar is pinned in the menu-bar strip; unset = free-floating, draggable bar. */
+export type FocusDock = 'notch-left' | 'notch-right' | 'top-left' | 'top-right'
+
+export const FOCUS_DOCKS: readonly FocusDock[] = ['notch-left', 'notch-right', 'top-left', 'top-right']
+
+export function isFocusDock(value: unknown): value is FocusDock {
+  return FOCUS_DOCKS.includes(value as FocusDock)
+}
+
+/** Docked (compact) focus bar: as tall as the notch, so it reads as an extension of it. */
+export const FOCUS_DOCK_HEIGHT = 32
+export const FOCUS_DOCK_WIDTH = 360
+
 export type CycleRole = 'must' | 'should' | 'could'
 
 export const CYCLE_ROLES: readonly CycleRole[] = ['must', 'should', 'could']
@@ -183,6 +196,7 @@ export interface AppConfig {
   obsidianStoragePath?: string
   obsidianVaultName?: string
   baseFontSize?: number
+  focusDock?: FocusDock
 }
 
 export interface FocusCheckIn {

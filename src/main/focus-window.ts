@@ -5,10 +5,12 @@ import { is } from '@electron-toolkit/utils'
 import type { IpcMain } from 'electron'
 import { showWindowVisible } from './window-utils'
 import { randomUUID } from 'crypto'
-import { appendCheckIn, appendOperation, getAppData, loadCheckIns, setAppDataKey } from './store'
+import { appendCheckIn, appendOperation, getAppData, loadCheckIns, notifyAllWindows, setAppDataKey } from './store'
 import { onFocusStart, onFocusStop } from './focus-blocker'
 import { addGameTokens } from './game-gate'
 import { STANDALONE_PROJECT_ID } from '../shared/constants'
+import { FOCUS_DOCK_HEIGHT, FOCUS_DOCK_WIDTH, isFocusDock } from '../shared/types'
+import type { FocusDock } from '../shared/types'
 
 let focusWindow: BrowserWindow | null = null
 let focusMenuWindow: BrowserWindow | null = null
@@ -202,6 +204,47 @@ export function stopFocusForCompletedTask(taskId: string): void {
 
 let _getMainWindow: (() => BrowserWindow | null) | null = null
 
+const FOCUS_FREE_WIDTH = 520
+
+/** Default spot of the free-floating bar: top-right of the primary display's work area. */
+function freeFocusPosition(): { x: number; y: number } {
+  const { x, y, width } = screen.getPrimaryDisplay().workArea
+  return { x: x + width - FOCUS_FREE_WIDTH - 16, y: y + 12 }
+}
+
+/**
+ * Bounds of the docked bar: inside the menu-bar strip, which a fullscreen app leaves
+ * black next to the notch — so the bar covers nothing there. Anchored so the window
+ * grows away from the notch / screen corner when a panel widens it.
+ */
+function dockedFocusBounds(dock: FocusDock, width: number, height: number): Electron.Rectangle {
+  // Only the built-in display has a notch.
+  const display = screen.getAllDisplays().find((d) => d.internal) ?? screen.getPrimaryDisplay()
+  const { x: dx, y: dy, width: dw } = display.bounds
+  // Electron exposes no notch geometry; the notch is ~12.5% of the built-in display's width.
+  // Tuck the black bar ~18px under it so the two always touch (the bar pads its content for this).
+  const notchHalf = display.internal ? Math.round(dw * 0.0625) - 18 : 0
+  const center = dx + dw / 2
+  const x =
+    dock === 'top-left' ? dx
+      : dock === 'top-right' ? dx + dw - width
+        : dock === 'notch-left' ? center - notchHalf - width
+          : center + notchHalf
+  return { x: Math.round(x), y: dy, width, height }
+}
+
+function placeFocusWindow(width: number, height: number): void {
+  if (!focusWindow || focusWindow.isDestroyed()) return
+  const dock = getAppData().config.focusDock
+  focusWindow.setMinimumSize(width, height)
+  if (dock) focusWindow.setBounds(dockedFocusBounds(dock, width, height))
+  else focusWindow.setSize(width, height)
+  // 'floating' is below the menu bar's level, so a docked bar would hide behind it.
+  focusWindow.setAlwaysOnTop(true, dock ? 'status' : 'floating')
+  // The native shadow outlines the whole window, which breaks the "part of the notch" look.
+  focusWindow.setHasShadow(!dock)
+}
+
 export function enterFocusMode(options?: { resumeStartedAt?: number }): { error: string } | undefined {
   if (focusWindow && !focusWindow.isDestroyed()) return { error: 'already_in_focus' }
 
@@ -211,27 +254,23 @@ export function enterFocusMode(options?: { resumeStartedAt?: number }): { error:
   // Hide main window
   mainWin.hide()
 
-  // Always open on primary display
-  const display = screen.getPrimaryDisplay()
-  const { x: workX, y: workY, width: workWidth } = display.workArea
-
-  const focusWidth = 520
-  const focusHeight = 64
-
-  // Create frameless focus window
+  // Free bar always opens on the primary display; a docked one goes straight to its strip.
+  const dock = getAppData().config.focusDock
   focusWindow = new BrowserWindow({
-    width: focusWidth,
-    height: focusHeight,
-    x: workX + workWidth - focusWidth - 16,
-    y: workY + 12,
+    ...(dock
+      ? dockedFocusBounds(dock, FOCUS_DOCK_WIDTH, FOCUS_DOCK_HEIGHT)
+      : { width: FOCUS_FREE_WIDTH, height: 64, ...freeFocusPosition() }),
+    // Without this macOS clamps the window below the menu bar (docked mode sits in it).
+    enableLargerThanScreen: true,
     frame: false,
     transparent: true,
     resizable: false,
     movable: true,
     skipTaskbar: true,
     alwaysOnTop: true,
-    hasShadow: true,
-    roundedCorners: true,
+    hasShadow: !dock,
+    // Native corner rounding would turn the docked bar into a pill; the bar rounds itself in CSS.
+    roundedCorners: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -240,7 +279,7 @@ export function enterFocusMode(options?: { resumeStartedAt?: number }): { error:
 
   // Keep on all Spaces but allow moving between monitors
   focusWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  focusWindow.setAlwaysOnTop(true, 'floating')
+  focusWindow.setAlwaysOnTop(true, dock ? 'status' : 'floating')
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     focusWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '#focus')
@@ -433,9 +472,19 @@ export function registerFocusHandlers(
   })
 
   ipcMain.handle('resize-focus-window', (_event, width: number, height: number) => {
-    if (!focusWindow || focusWindow.isDestroyed()) return
-    focusWindow.setMinimumSize(width, height)
-    focusWindow.setSize(width, height)
+    placeFocusWindow(width, height)
+  })
+
+  ipcMain.handle('set-focus-dock', (_event, dock: unknown) => {
+    const focusDock = isFocusDock(dock) ? dock : undefined
+    setAppDataKey('config', { ...getAppData().config, focusDock })
+    // Undocking: leave the menu-bar strip, where a 'floating' window is invisible.
+    if (!focusDock && focusWindow && !focusWindow.isDestroyed()) {
+      const { x, y } = freeFocusPosition()
+      focusWindow.setPosition(x, y)
+    }
+    // The focus window reloads config and re-sends its size, which applies the new dock.
+    notifyAllWindows()
   })
 
   let pendingMenuItems: { id: string; label: string; type?: 'separator' }[] = []

@@ -7,7 +7,8 @@ import { STANDALONE_PROJECT_ID } from '../utils/constants'
 import type { Task, ProjectLink, QuickTask } from '../types'
 import { formatTaskId, formatQuickTaskId } from '../../shared/taskId'
 import { collectAnchorCodes } from '../../shared/task-list'
-import { CYCLE_BADGE_LABEL } from '../../shared/types'
+import { CYCLE_BADGE_LABEL, FOCUS_DOCK_HEIGHT, FOCUS_DOCK_WIDTH } from '../../shared/types'
+import type { FocusDock } from '../../shared/types'
 import { Linkify } from './Linkify'
 import { cleanSplitTitle } from '../utils/splitTask'
 import { nextRolloverIso, minutesWorkedToday } from '../utils/finishForToday'
@@ -58,6 +59,15 @@ const FOCUS_HEIGHT_NORMAL = 64
 const FOCUS_HEIGHT_PICKER = 480
 const FOCUS_HEIGHT_BLOCKS = 520
 
+// Context-menu entries for pinning the bar into the menu-bar strip ('free' = undock).
+const DOCK_MENU: { dock: FocusDock | 'free'; label: string }[] = [
+  { dock: 'notch-left', label: '📌  Przy notchu z lewej' },
+  { dock: 'notch-right', label: '📌  Przy notchu z prawej' },
+  { dock: 'top-left', label: '📌  Lewy górny róg' },
+  { dock: 'top-right', label: '📌  Prawy górny róg' },
+  { dock: 'free', label: '↔   Pasek swobodny' }
+]
+
 interface BlockMeta { key: string; label: string; groups: string[]; sites: string[]; apps: string[] }
 interface BlockStatePayload {
   groups: { key: string; label: string }[]
@@ -101,16 +111,35 @@ export default function FocusMode() {
     return () => clearInterval(interval)
   }, [])
 
-  // Resize focus window based on open popups
+  // Docked = compact bar pinned in the menu-bar strip (see dockedFocusBounds in main).
+  const dock = config.focusDock
+  const docked = !!dock
+  // Docked bar is black and flush with the top of the screen, like a wider notch:
+  // square top, rounded bottom corners, no border. The right end needs the wide padding only
+  // when it is the side tucked under the notch; the buttons there carry their own inset.
+  const barPadding = dock === 'notch-left' || dock === 'top-right' ? 'px-6' : 'pl-6 pr-2'
+  const barShell = docked
+    ? 'h-[32px] flex items-center bg-black rounded-b-xl'
+    : 'h-[50px] flex items-center rounded-xl bg-clean-view/95 border border-border/50'
+  // On the black strip theme colors don't apply (light theme would be dark-on-black).
+  const barText = docked ? 'text-white/90' : 'text-t-primary'
+  const barMuted = docked ? 'text-white/50' : 'text-t-muted'
+  const barDrag = { WebkitAppRegion: docked ? 'no-drag' : 'drag' } as React.CSSProperties
+  const actionBtn = docked ? 'w-[22px] h-[22px] rounded-[6px]' : 'w-[28px] h-[28px] rounded-[7px]'
+  const panelTop = docked ? FOCUS_DOCK_HEIGHT + 4 : 54
+
+  // Resize focus window based on open popups (main re-applies the dock position on every resize)
   useEffect(() => {
     if (showTaskPicker) {
       window.api.resizeFocusWindow(FOCUS_WIDTH, FOCUS_HEIGHT_PICKER)
     } else if (showBlockConfig) {
       window.api.resizeFocusWindow(FOCUS_WIDTH, FOCUS_HEIGHT_BLOCKS)
+    } else if (dock) {
+      window.api.resizeFocusWindow(FOCUS_DOCK_WIDTH, FOCUS_DOCK_HEIGHT)
     } else {
       window.api.resizeFocusWindow(FOCUS_WIDTH, FOCUS_HEIGHT_NORMAL)
     }
-  }, [showTaskPicker, showBlockConfig])
+  }, [showTaskPicker, showBlockConfig, dock])
 
   // Load the blocker state for the focused task; on first launch (nothing saved)
   // open the config panel pre-filled with the default meta.
@@ -217,8 +246,12 @@ export default function FocusMode() {
       items.push({ id: 'finish-today', label: '🌙   Skończone na dzisiaj' })
     }
     items.push({ id: 'exit', label: '✕   Exit focus' })
+    items.push({ id: 'sep-dock', label: '', type: 'separator' })
+    for (const entry of DOCK_MENU) {
+      if (entry.dock !== (dock ?? 'free')) items.push({ id: `dock:${entry.dock}`, label: entry.label })
+    }
     window.api.showFocusContextMenu(items, e.clientX, e.clientY)
-  }, [taskLinks, projectLinks, obsidianEnabled, project, canFinishToday])
+  }, [taskLinks, projectLinks, obsidianEnabled, project, canFinishToday, dock])
 
   // Handle context menu actions from popup window
   useEffect(() => {
@@ -243,6 +276,9 @@ export default function FocusMode() {
         handleFinishToday()
       } else if (actionId === 'exit') {
         handleExit()
+      } else if (actionId.startsWith('dock:')) {
+        const target = actionId.slice(5)
+        window.api.setFocusDock(target === 'free' ? null : (target as FocusDock))
       }
     })
   })
@@ -446,10 +482,10 @@ export default function FocusMode() {
   if (showManualTime) {
     return (
       <div
-        className="h-[50px] flex items-center px-4 gap-3 rounded-xl bg-clean-view/95 border border-border/50"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        className={`${barShell} px-4 gap-3`}
+        style={barDrag}
       >
-        <span className="text-[13px] text-t-primary flex-shrink-0">
+        <span className={`text-[13px] ${barText} flex-shrink-0`}>
           Dodaj czas (min):
         </span>
         <div className="flex gap-2 items-center flex-shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -488,10 +524,10 @@ export default function FocusMode() {
   if (confirmAction !== null) {
     return (
       <div
-        className="h-[50px] flex items-center px-4 gap-3 rounded-xl bg-clean-view/95 border border-border/50"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        className={`${barShell} px-4 gap-3`}
+        style={barDrag}
       >
-        <span className="text-[13px] text-t-primary flex-shrink-0">
+        <span className={`text-[13px] ${barText} flex-shrink-0`}>
           Zapisać {confirmAction.minutes} min?
         </span>
         <div className="flex gap-2 flex-shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
@@ -520,8 +556,8 @@ export default function FocusMode() {
     >
       {/* Main bar */}
       <div
-        className="h-[50px] flex items-center pl-4 pr-1.5 gap-2.5 rounded-xl bg-clean-view/95 border border-border/50"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        className={`${barShell} ${docked ? `${barPadding} gap-2` : 'pl-4 pr-1.5 gap-2.5'}`}
+        style={barDrag}
         onContextMenu={handleContextMenu}
       >
         <div
@@ -552,13 +588,13 @@ export default function FocusMode() {
               >$</span>
             )}
             <span
-              className="text-[15px] font-semibold leading-tight truncate text-t-primary min-w-0 cursor-default"
+              className={`${docked ? 'text-[13px]' : 'text-[15px]'} font-semibold leading-tight truncate ${barText} min-w-0 cursor-default`}
               onDoubleClick={() => { if (task?.title) navigator.clipboard.writeText(task.title) }}
             >
               {task?.title ? <Linkify text={cleanSplitTitle(task.title)} /> : 'No task'}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 min-w-0 text-[11px] leading-tight text-t-muted">
+          {!docked && <div className="flex items-center gap-1.5 min-w-0 text-[11px] leading-tight text-t-muted">
             {projLabel && (
               <button
                 className="flex-shrink-0 hover:text-t-primary transition-colors cursor-pointer bg-transparent border-none p-0"
@@ -584,7 +620,7 @@ export default function FocusMode() {
                 <span className="truncate" style={{ fontFamily: 'monospace' }}>{formatTotalLabel(totalMinutes)}</span>
               </>
             )}
-          </div>
+          </div>}
         </div>
 
         {repeatingTaskLink && (
@@ -599,7 +635,7 @@ export default function FocusMode() {
         )}
         <button
           onClick={openManualTime}
-          className="flex items-center flex-shrink-0 self-center whitespace-nowrap bg-blue-500/12 hover:bg-blue-500/20 rounded-[10px] px-2.5 py-[4px] border-none cursor-pointer transition-colors"
+          className={`flex items-center flex-shrink-0 self-center whitespace-nowrap bg-blue-500/12 hover:bg-blue-500/20 rounded-[10px] ${docked ? 'px-2 py-0' : 'px-2.5 py-[4px]'} border-none cursor-pointer transition-colors`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           title="Dodaj czas"
         >
@@ -615,8 +651,8 @@ export default function FocusMode() {
         >
           <button
             onClick={() => setShowBlockConfig((v) => !v)}
-            className={`w-[28px] h-[28px] rounded-[7px] bg-transparent text-[12px] transition-all flex items-center justify-center cursor-pointer border-none ${
-              showBlockConfig ? 'text-amber-400 bg-amber-500/15' : 'text-t-muted hover:bg-amber-500/15 hover:text-amber-400'
+            className={`${actionBtn} bg-transparent text-[12px] transition-all flex items-center justify-center cursor-pointer border-none ${
+              showBlockConfig ? 'text-amber-400 bg-amber-500/15' : `${barMuted} hover:bg-amber-500/15 hover:text-amber-400`
             }`}
             title="Blokady focusa"
           >
@@ -624,7 +660,7 @@ export default function FocusMode() {
           </button>
           <button
             onClick={showFinishToday ? handleFinishToday : handleComplete}
-            className={`w-[28px] h-[28px] rounded-[7px] bg-transparent text-t-muted text-[12px] transition-all flex items-center justify-center cursor-pointer border-none ${
+            className={`${actionBtn} bg-transparent ${barMuted} text-[12px] transition-all flex items-center justify-center cursor-pointer border-none ${
               showFinishToday ? 'hover:bg-blue-500/15 hover:text-blue-400' : 'hover:bg-green-500/15 hover:text-green-400'
             }`}
             title={showFinishToday ? 'Skończone na dzisiaj' : 'Complete task'}
@@ -633,7 +669,7 @@ export default function FocusMode() {
           </button>
           <button
             onClick={handleExit}
-            className="w-[28px] h-[28px] rounded-[7px] bg-transparent text-t-muted text-[12px] hover:bg-red-500/15 hover:text-red-400 transition-all flex items-center justify-center cursor-pointer border-none"
+            className={`${actionBtn} bg-transparent ${barMuted} text-[12px] hover:bg-red-500/15 hover:text-red-400 transition-all flex items-center justify-center cursor-pointer border-none`}
             title="Exit focus"
           >
             ✕
@@ -643,7 +679,7 @@ export default function FocusMode() {
 
       {/* Task picker popup */}
       {showTaskPicker && (
-        <div className="absolute top-[54px] left-0 right-0 mx-2 rounded-lg bg-clean-view/95 border border-border/50 shadow-lg overflow-hidden">
+        <div className="absolute left-0 right-0 mx-2 rounded-lg bg-clean-view/95 border border-border/50 shadow-lg overflow-hidden" style={{ top: panelTop }}>
           <div className="px-3 py-2 border-b border-border/30">
             <span className="text-[11px] text-t-muted">Następne zadanie:</span>
           </div>
@@ -682,8 +718,8 @@ export default function FocusMode() {
       {/* Focus blocker config panel */}
       {showBlockConfig && blockState && (
         <div
-          className="absolute top-[54px] left-0 right-0 mx-2 rounded-lg bg-clean-view/95 border border-border/50 shadow-lg overflow-hidden"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="absolute left-0 right-0 mx-2 rounded-lg bg-clean-view/95 border border-border/50 shadow-lg overflow-hidden"
+          style={{ top: panelTop, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <div className="px-3 py-2 border-b border-border/30 flex items-center justify-between">
             <span className="text-[11px] text-t-muted">Blokady focusa</span>

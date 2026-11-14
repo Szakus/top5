@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webFrame } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { AppConfig, CycleRole, FocusCheckIn, OperationLogEntry, Project, QuickTask, RepeatingTask, ApiConfig, EnergyTrackerConfig, GameGateConfig, LockedTaskRef, WinsLockState, WinEntry, StreakStats, Habit, HabitTodayEntry } from '../shared/types'
+import type { AppConfig, CycleRole, FocusCheckIn, FocusDock, OperationLogEntry, Project, QuickTask, RepeatingTask, ApiConfig, EnergyTrackerConfig, GameGateConfig, LockedTaskRef, WinsLockState, WinEntry, StreakStats, Habit, HabitTodayEntry } from '../shared/types'
 
 interface ShortcutActionPayload {
   action: string
@@ -67,6 +67,7 @@ export const api = {
   getOperations: (since?: string): Promise<OperationLogEntry[]> => ipcRenderer.invoke('get-operations', since),
   switchFocusTask: (projectId: string, taskId: string) => ipcRenderer.invoke('switch-focus-task', projectId, taskId),
   resizeFocusWindow: (width: number, height: number) => ipcRenderer.invoke('resize-focus-window', width, height),
+  setFocusDock: (dock: FocusDock | null) => ipcRenderer.invoke('set-focus-dock', dock),
   showFocusContextMenu: (items: { id: string; label: string; type?: 'separator' }[], clickX: number, clickY: number) => ipcRenderer.invoke('show-focus-context-menu', items, clickX, clickY),
   getFocusMenuItems: (): Promise<{ id: string; label: string; type?: 'separator' }[]> => ipcRenderer.invoke('get-focus-menu-items'),
   focusMenuClick: (actionId: string) => ipcRenderer.invoke('focus-menu-click', actionId),
