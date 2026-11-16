@@ -212,14 +212,35 @@ function freeFocusPosition(): { x: number; y: number } {
   return { x: x + width - FOCUS_FREE_WIDTH - 16, y: y + 12 }
 }
 
+/** True when enough of the rect lies on a connected display to be seen and grabbed. */
+function isOnScreen(rect: Electron.Rectangle): boolean {
+  return screen.getAllDisplays().some(({ bounds: d }) => {
+    const w = Math.min(rect.x + rect.width, d.x + d.width) - Math.max(rect.x, d.x)
+    const h = Math.min(rect.y + rect.height, d.y + d.height) - Math.max(rect.y, d.y)
+    return w >= 40 && h >= 10
+  })
+}
+
 /**
  * Bounds of the docked bar: inside the menu-bar strip, which a fullscreen app leaves
  * black next to the notch — so the bar covers nothing there. Anchored so the window
  * grows away from the notch / screen corner when a panel widens it.
  */
 function dockedFocusBounds(dock: FocusDock, width: number, height: number): Electron.Rectangle {
-  // Only the built-in display has a notch.
-  const display = screen.getAllDisplays().find((d) => d.internal) ?? screen.getPrimaryDisplay()
+  // A spot the user dragged the bar to wins over the preset - but only while its display is
+  // connected (lid closed, monitor unplugged); the spot is kept for when the display returns.
+  const pos = getAppData().config.focusDockPos
+  if (pos && isOnScreen({ ...pos, width: FOCUS_DOCK_WIDTH, height: FOCUS_DOCK_HEIGHT })) {
+    const { bounds: d } = screen.getDisplayMatching({ ...pos, width: FOCUS_DOCK_WIDTH, height: FOCUS_DOCK_HEIGHT })
+    // A panel widens the window: keep it inside the display.
+    const x = Math.max(d.x, Math.min(pos.x, d.x + d.width - width))
+    return { x, y: pos.y, width, height }
+  }
+  // Only the built-in display has a notch; corners go to the display that owns the menu bar.
+  // With the lid closed there is no internal display, so everything lands on the primary one.
+  const internal = screen.getAllDisplays().find((d) => d.internal)
+  const byNotch = dock === 'notch-left' || dock === 'notch-right'
+  const display = (byNotch && internal) || screen.getPrimaryDisplay()
   const { x: dx, y: dy, width: dw } = display.bounds
   // Electron exposes no notch geometry; the notch is ~12.5% of the built-in display's width.
   // Tuck the black bar ~18px under it so the two always touch (the bar pads its content for this).
@@ -237,12 +258,65 @@ function placeFocusWindow(width: number, height: number): void {
   if (!focusWindow || focusWindow.isDestroyed()) return
   const dock = getAppData().config.focusDock
   focusWindow.setMinimumSize(width, height)
-  if (dock) focusWindow.setBounds(dockedFocusBounds(dock, width, height))
-  else focusWindow.setSize(width, height)
+  if (dock) {
+    focusWindow.setBounds(dockedFocusBounds(dock, width, height))
+  } else {
+    focusWindow.setSize(width, height)
+    // Free bar left on a display that is gone: bring it back to the default spot.
+    if (!isOnScreen(focusWindow.getBounds())) {
+      const { x, y } = freeFocusPosition()
+      focusWindow.setPosition(x, y)
+    }
+  }
   // 'floating' is below the menu bar's level, so a docked bar would hide behind it.
   focusWindow.setAlwaysOnTop(true, dock ? 'status' : 'floating')
   // The native shadow outlines the whole window, which breaks the "part of the notch" look.
   focusWindow.setHasShadow(!dock)
+}
+
+/** Re-apply the current size's placement, e.g. after the set of displays changed. */
+function replaceFocusWindow(): void {
+  if (!focusWindow || focusWindow.isDestroyed()) return
+  const { width, height } = focusWindow.getBounds()
+  placeFocusWindow(width, height)
+}
+
+let dockDragTimer: ReturnType<typeof setInterval> | null = null
+/** A plain click on the bar must not turn the preset into a dragged position. */
+let dockDragMoved = false
+
+/**
+ * Drag of the docked bar, driven from main: a native window drag cannot enter the menu-bar
+ * strip. The bar follows the cursor horizontally and stays glued to the top edge of whatever
+ * display the cursor is on.
+ */
+function startDockDrag(): void {
+  stopDockDrag(false)
+  if (!focusWindow || focusWindow.isDestroyed() || !getAppData().config.focusDock) return
+  const start = focusWindow.getBounds()
+  // Only the collapsed bar is draggable; with a panel open the window is wider than the bar.
+  if (start.width !== FOCUS_DOCK_WIDTH) return
+  const grabOffset = screen.getCursorScreenPoint().x - start.x
+  dockDragMoved = false
+  dockDragTimer = setInterval(() => {
+    if (!focusWindow || focusWindow.isDestroyed()) return stopDockDrag(false)
+    const cursor = screen.getCursorScreenPoint()
+    const { bounds: d } = screen.getDisplayNearestPoint(cursor)
+    const x = Math.max(d.x, Math.min(cursor.x - grabOffset, d.x + d.width - start.width))
+    if (x === start.x && d.y === start.y && !dockDragMoved) return
+    dockDragMoved = true
+    focusWindow.setBounds({ x, y: d.y, width: start.width, height: start.height })
+  }, 16)
+}
+
+function stopDockDrag(save: boolean): void {
+  if (!dockDragTimer) return
+  clearInterval(dockDragTimer)
+  dockDragTimer = null
+  if (!save || !dockDragMoved || !focusWindow || focusWindow.isDestroyed()) return
+  const { x, y } = focusWindow.getBounds()
+  setAppDataKey('config', { ...getAppData().config, focusDockPos: { x, y } })
+  notifyAllWindows()
 }
 
 export function enterFocusMode(options?: { resumeStartedAt?: number }): { error: string } | undefined {
@@ -288,6 +362,7 @@ export function enterFocusMode(options?: { resumeStartedAt?: number }): { error:
   }
 
   focusWindow.on('closed', () => {
+    stopDockDrag(false)
     focusWindow = null
   })
 
@@ -475,17 +550,30 @@ export function registerFocusHandlers(
     placeFocusWindow(width, height)
   })
 
+  ipcMain.handle('focus-dock-drag', (_event, active: unknown) => {
+    if (active === true) startDockDrag()
+    else stopDockDrag(true)
+  })
+
   ipcMain.handle('set-focus-dock', (_event, dock: unknown) => {
     const focusDock = isFocusDock(dock) ? dock : undefined
-    setAppDataKey('config', { ...getAppData().config, focusDock })
+    // Picking a preset drops the dragged position.
+    setAppDataKey('config', { ...getAppData().config, focusDock, focusDockPos: undefined })
     // Undocking: leave the menu-bar strip, where a 'floating' window is invisible.
     if (!focusDock && focusWindow && !focusWindow.isDestroyed()) {
       const { x, y } = freeFocusPosition()
       focusWindow.setPosition(x, y)
     }
-    // The focus window reloads config and re-sends its size, which applies the new dock.
+    // The focus window reloads config and re-sends its size, which applies the new dock;
+    // re-picking the current preset changes nothing there, so place it here too.
+    replaceFocusWindow()
     notifyAllWindows()
   })
+
+  // Monitor plugged/unplugged, lid closed, resolution changed: never leave the bar off-screen.
+  screen.on('display-added', replaceFocusWindow)
+  screen.on('display-removed', replaceFocusWindow)
+  screen.on('display-metrics-changed', replaceFocusWindow)
 
   let pendingMenuItems: { id: string; label: string; type?: 'separator' }[] = []
 

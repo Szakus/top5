@@ -197,6 +197,8 @@ export interface AppConfig {
   obsidianVaultName?: string
   baseFontSize?: number
   focusDock?: FocusDock
+  /** Screen position the docked bar was dragged to; overrides the `focusDock` preset. */
+  focusDockPos?: { x: number; y: number }
 }
 
 export interface FocusCheckIn {

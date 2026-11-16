@@ -441,6 +441,12 @@ function normalizeActionShortcuts(value: unknown): Record<string, string> {
   return next
 }
 
+function isPoint(value: unknown): value is { x: number; y: number } {
+  if (!value || typeof value !== 'object') return false
+  const { x, y } = value as Record<string, unknown>
+  return Number.isFinite(x) && Number.isFinite(y)
+}
+
 function normalizeAppConfig(value: unknown): AppConfig {
   if (!isRecord(value)) return { ...defaultData.config }
   return {
@@ -464,7 +470,8 @@ function normalizeAppConfig(value: unknown): AppConfig {
       ? value.obsidianVaultName.trim()
       : undefined,
     baseFontSize: typeof value.baseFontSize === 'number' ? Math.max(10, Math.min(18, value.baseFontSize)) : undefined,
-    focusDock: isFocusDock(value.focusDock) ? value.focusDock : undefined
+    focusDock: isFocusDock(value.focusDock) ? value.focusDock : undefined,
+    focusDockPos: isPoint(value.focusDockPos) ? { x: value.focusDockPos.x, y: value.focusDockPos.y } : undefined
   }
 }
 
@@ -496,6 +503,7 @@ function isValidAppConfig(value: unknown): value is AppConfig {
   if (value.obsidianVaultName !== undefined && typeof value.obsidianVaultName !== 'string') return false
   if (value.baseFontSize !== undefined && (typeof value.baseFontSize !== 'number' || value.baseFontSize < 10 || value.baseFontSize > 18)) return false
   if (value.focusDock !== undefined && !isFocusDock(value.focusDock)) return false
+  if (value.focusDockPos !== undefined && !isPoint(value.focusDockPos)) return false
   return true
 }
 

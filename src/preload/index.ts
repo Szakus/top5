@@ -68,6 +68,7 @@ export const api = {
   switchFocusTask: (projectId: string, taskId: string) => ipcRenderer.invoke('switch-focus-task', projectId, taskId),
   resizeFocusWindow: (width: number, height: number) => ipcRenderer.invoke('resize-focus-window', width, height),
   setFocusDock: (dock: FocusDock | null) => ipcRenderer.invoke('set-focus-dock', dock),
+  focusDockDrag: (active: boolean) => ipcRenderer.invoke('focus-dock-drag', active),
   showFocusContextMenu: (items: { id: string; label: string; type?: 'separator' }[], clickX: number, clickY: number) => ipcRenderer.invoke('show-focus-context-menu', items, clickX, clickY),
   getFocusMenuItems: (): Promise<{ id: string; label: string; type?: 'separator' }[]> => ipcRenderer.invoke('get-focus-menu-items'),
   focusMenuClick: (actionId: string) => ipcRenderer.invoke('focus-menu-click', actionId),

@@ -122,12 +122,26 @@ export default function FocusMode() {
   // (the black background stays opaque so it still merges with the notch).
   const barDim = '[&>*]:opacity-50 [&>*]:grayscale [&>*]:transition-[opacity,filter] hover:[&>*]:opacity-100 hover:[&>*]:grayscale-0'
   const barShell = docked
-    ? 'h-[32px] flex items-center bg-black rounded-b-xl'
+    ? 'h-[32px] flex items-center bg-black rounded-b-xl select-none'
     : 'h-[50px] flex items-center rounded-xl bg-clean-view/95 border border-border/50'
   // On the black strip theme colors don't apply (light theme would be dark-on-black).
   const barText = docked ? 'text-white/90' : 'text-t-primary'
   const barMuted = docked ? 'text-white/50' : 'text-t-muted'
+  // The free bar uses a native window drag. The docked one is dragged by main (focusDockDrag),
+  // which keeps it glued to the top edge of the display under the cursor.
   const barDrag = { WebkitAppRegion: docked ? 'no-drag' : 'drag' } as React.CSSProperties
+  const dockDragHandlers = docked
+    ? {
+        onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+          if (e.button !== 0 || (e.target as HTMLElement).closest('button, input, a')) return
+          e.currentTarget.setPointerCapture(e.pointerId)
+          window.api.focusDockDrag(true)
+        },
+        onPointerUp: () => window.api.focusDockDrag(false),
+        onPointerCancel: () => window.api.focusDockDrag(false),
+        onLostPointerCapture: () => window.api.focusDockDrag(false)
+      }
+    : {}
   const actionBtn = docked ? 'w-[22px] h-[22px] rounded-[6px]' : 'w-[28px] h-[28px] rounded-[7px]'
   const panelTop = docked ? FOCUS_DOCK_HEIGHT + 4 : 54
 
@@ -251,10 +265,11 @@ export default function FocusMode() {
     items.push({ id: 'exit', label: '✕   Exit focus' })
     items.push({ id: 'sep-dock', label: '', type: 'separator' })
     for (const entry of DOCK_MENU) {
-      if (entry.dock !== (dock ?? 'free')) items.push({ id: `dock:${entry.dock}`, label: entry.label })
+      // After a drag the current preset stays in the menu: picking it snaps the bar back.
+      if (entry.dock !== (dock ?? 'free') || config.focusDockPos) items.push({ id: `dock:${entry.dock}`, label: entry.label })
     }
     window.api.showFocusContextMenu(items, e.clientX, e.clientY)
-  }, [taskLinks, projectLinks, obsidianEnabled, project, canFinishToday, dock])
+  }, [taskLinks, projectLinks, obsidianEnabled, project, canFinishToday, dock, config.focusDockPos])
 
   // Handle context menu actions from popup window
   useEffect(() => {
@@ -562,6 +577,7 @@ export default function FocusMode() {
         className={`${barShell} ${docked ? `${barPadding} gap-2 ${barDim}` : 'pl-4 pr-1.5 gap-2.5'}`}
         style={barDrag}
         onContextMenu={handleContextMenu}
+        {...dockDragHandlers}
       >
         <div
           className={`w-[7px] h-[7px] rounded-full ${docked ? '' : 'animate-pulse'} flex-shrink-0 self-center`}

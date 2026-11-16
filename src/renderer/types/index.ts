@@ -98,6 +98,7 @@ declare global {
       switchFocusTask: (projectId: string, taskId: string) => Promise<void>
       resizeFocusWindow: (width: number, height: number) => Promise<void>
       setFocusDock: (dock: import('../../shared/types').FocusDock | null) => Promise<void>
+      focusDockDrag: (active: boolean) => Promise<void>
       showFocusContextMenu: (items: { id: string; label: string; type?: 'separator' }[], clickX: number, clickY: number) => Promise<void>
       getFocusMenuItems: () => Promise<{ id: string; label: string; type?: 'separator' }[]>
       focusMenuClick: (actionId: string) => Promise<void>
