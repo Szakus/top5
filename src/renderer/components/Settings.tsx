@@ -15,7 +15,7 @@ const SHORTCUT_ROWS: Array<{ action: string; shortcut: string }> = [
   { action: 'New task', shortcut: 'N' },
   { action: 'Focus mode', shortcut: '⌘ Shift F' },
   { action: 'Project 1–5', shortcut: '⌘ 1-5' },
-  { action: 'Quick notes', shortcut: '⌘ Shift N' },
+  { action: 'Quick notes', shortcut: '⌃ ⌥ Shift N' },
   { action: 'Toggle theme', shortcut: '⌘ Shift T' }
 ]
 

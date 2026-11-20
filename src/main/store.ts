@@ -80,7 +80,7 @@ const defaultData: AppData = {
       'project-4': 'CommandOrControl+4',
       'project-5': 'CommandOrControl+5',
       'toggle-focus': 'CommandOrControl+Shift+F',
-      'quick-notes': 'CommandOrControl+Shift+N'
+      'quick-notes': 'Control+Alt+Shift+N'
     },
     focusTaskId: null,
     focusProjectId: null,
@@ -437,6 +437,10 @@ function normalizeActionShortcuts(value: unknown): Record<string, string> {
     if (isValidAccelerator(candidate)) {
       next[action] = candidate.trim()
     }
+  }
+  // Migration: old default collided with the global Quick Add shortcut
+  if (next['quick-notes'] === 'CommandOrControl+Shift+N') {
+    next['quick-notes'] = defaultData.config.actionShortcuts['quick-notes']
   }
   return next
 }

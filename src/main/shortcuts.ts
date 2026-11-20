@@ -19,6 +19,10 @@ function parseAccelerator(accel: string): ParsedAccelerator | null {
     if (lower === 'commandorcontrol' || lower === 'cmdorctrl') {
       if (process.platform === 'darwin') result.meta = true
       else result.ctrl = true
+    } else if (lower === 'ctrl' || lower === 'control') {
+      result.ctrl = true
+    } else if (lower === 'cmd' || lower === 'command') {
+      result.meta = true
     } else if (lower === 'shift') {
       result.shift = true
     } else if (lower === 'alt' || lower === 'option') {
@@ -31,13 +35,17 @@ function parseAccelerator(accel: string): ParsedAccelerator | null {
 }
 
 function matchesInput(input: Electron.Input, parsed: ParsedAccelerator): boolean {
+  // With Option held on macOS, input.key is the composed character (e.g. dead keys), so also match the physical letter key
+  const keyMatches =
+    input.key.toLowerCase() === parsed.key ||
+    (/^[a-z]$/.test(parsed.key) && input.code === `Key${parsed.key.toUpperCase()}`)
   return (
     input.type === 'keyDown' &&
     input.control === parsed.ctrl &&
     input.meta === parsed.meta &&
     input.shift === parsed.shift &&
     input.alt === parsed.alt &&
-    input.key.toLowerCase() === parsed.key
+    keyMatches
   )
 }
 
