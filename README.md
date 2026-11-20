@@ -13,7 +13,7 @@ Desktop app for attention management. Configurable project limit (default 5), mi
 - **Project links** — flexible label+URL pairs supporting vscode://, iterm://, obsidian://, mailto://, http(s):// protocols
 - **Quick tasks** — standalone task list + pinned "To Do Next" tasks from projects, configurable limit (default 5)
 - **In-progress status** — mark tasks as in-progress with visual amber indicators
-- **Quick Add** — global overlay (`Cmd+Shift+N`) for rapidly adding tasks, projects, and repeating tasks without opening the main window; keyboard-driven with Tab to switch modes, `Cmd+1-9` to select project, due date picker, Enter to submit
+- **Quick Add** — global overlay (`Ctrl+Option+Shift+N`) for rapidly adding tasks, projects, and repeating tasks without opening the main window; keyboard-driven with Tab to switch modes, `Cmd+1-9` to select project, due date picker, Enter to submit
 - **Tasks per project** — full-screen detail view with task list, inline editing, completion, deletion, time tracking
 - **Focus mode** — compact always-on-top bar with session timer and context menu (project links, open project, manual time entry, complete, exit), plus double-click to copy task title
 - **Focus check-ins** — every 15 min asks if you're still working; tracks time per project and task
@@ -27,7 +27,7 @@ Desktop app for attention management. Configurable project limit (default 5), mi
 - **Project suspend** — temporarily pause projects without archiving, excluded from the active limit; new projects auto-suspend when limit is reached
 - **Light/dark theme** — warm notebook palette (light) or OLED-friendly dark, persisted across sessions
 - **Quick notes** — global scratchpad in a slide-in panel
-- **Shortcuts** — `Cmd+Shift+Space` (global) to toggle app; `Cmd+Shift+N` (global) for Quick Add; `Cmd+1-5` to jump to project and `Cmd+Shift+F` to toggle focus (local, configurable)
+- **Shortcuts** — `Cmd+Shift+Space` (global) to toggle app; `Ctrl+Option+Shift+N` (global) for Quick Add; `Cmd+1-5` to jump to project and `Cmd+Shift+F` to toggle focus (local, configurable)
 - **Obsidian journal** — auto-generated daily/weekly/monthly notes in Obsidian vault with completed tasks, focus time, and 5 Wins results; preserves user-written reflections on re-generation; project dictionary for autocomplete via Various Complements plugin ([docs](docs/journal.md))
 - **Deep links** — `top5://project/<id>` links open projects from Obsidian notes or terminal; single instance lock ensures the running app handles the navigation
 - **HTTP API** — local REST API (Fastify, `127.0.0.1:15055`) for automations and AI agents; Bearer token auth, full CRUD for projects, quick tasks, and repeating tasks ([docs](docs/API.md))
@@ -84,7 +84,7 @@ npm run test:api
 | `Cmd+Shift+Space` | Global | Toggle app |
 | `Cmd+1..5` | Local | Switch to project (configurable) |
 | `Cmd+Shift+F` | Local | Toggle focus mode (configurable) |
-| `Cmd+Shift+N` | Global | Quick Add window (configurable) |
+| `Ctrl+Option+Shift+N` | Global | Quick Add window (configurable) |
 | `Tab` | Quick Add | Switch between Task / Project / Repeat modes |
 | `n` | Local | Add quick task / focus add-task input (context-dependent) |
 | `j` | Local | Generate and open today's journal note in Obsidian |

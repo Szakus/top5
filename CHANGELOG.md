@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Skrót Quick notes zmieniony z `Cmd+Shift+N` na `Ctrl+Option+Shift+N` (kolidował z globalnym Quick Add). Zapisany stary domyślny skrót jest migrowany automatycznie.
+- Globalny skrót Quick Add zmieniony z `Cmd+Shift+N` na `Ctrl+Option+Shift+N` (kolidował z oknem incognito w przeglądarce). Quick notes zostaje lokalnie na `Cmd+Shift+N`.
 
 ## [1.122.3] - 2026-11-02
 

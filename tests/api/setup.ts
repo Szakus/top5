@@ -48,7 +48,7 @@ export function setupTestEnv(): void {
           'project-4': 'CommandOrControl+4',
           'project-5': 'CommandOrControl+5',
           'toggle-focus': 'CommandOrControl+Shift+F',
-          'quick-notes': 'Control+Alt+Shift+N'
+          'quick-notes': 'CommandOrControl+Shift+N'
         },
         focusTaskId: null,
         focusProjectId: null,
@@ -87,7 +87,7 @@ export function setupTestEnv(): void {
           'project-4': 'CommandOrControl+4',
           'project-5': 'CommandOrControl+5',
           'toggle-focus': 'CommandOrControl+Shift+F',
-          'quick-notes': 'Control+Alt+Shift+N'
+          'quick-notes': 'CommandOrControl+Shift+N'
         },
         focusTaskId: null,
         focusProjectId: null,

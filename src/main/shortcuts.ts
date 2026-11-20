@@ -68,7 +68,7 @@ export function registerGlobalShortcut(
     }
   })
 
-  const quickAddShortcut = shortcuts['quick-add'] || 'CommandOrControl+Shift+N'
+  const quickAddShortcut = shortcuts['quick-add'] || 'Control+Alt+Shift+N'
   globalShortcutModule.register(quickAddShortcut, () => {
     toggleQuickAddWindow()
   })
